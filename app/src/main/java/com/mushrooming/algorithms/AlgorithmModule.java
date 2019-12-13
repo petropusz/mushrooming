@@ -5,6 +5,8 @@ import com.mushrooming.base.Team;
 
 import org.osmdroid.util.GeoPoint;
 
+import java.util.Collection;
+
 /**
  * Created by piotrek on 29.11.17.
  */
@@ -27,6 +29,11 @@ public class AlgorithmModule {
         _terrainOKmap.markPosition(pos);
     }
 
+    public void markVisited(Collection<Position> posGPSlist) {
+        for (Position p : posGPSlist) {
+            markVisited(p);
+        }
+    }
 
     public boolean checkIfAssemblyNeeded(Team team) {
         return _graphManager.checkIfAssemblyNeeded(team);

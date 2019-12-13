@@ -110,6 +110,7 @@ public class MapModule {
     }
 
     // currently switches between marking two different hardcoded positions
+    // test currently present in the app, so it is here to be invoked by App class on real device
     public void testMarkPosition() {
 
         //  if mv.getOverlays().contains(marker) {  mv.getOverlays().remove(marker); }
@@ -149,11 +150,11 @@ public class MapModule {
         ic1.mutate(); // so that not all that icons will be changed
 
         if (whichPos == 1) {
-            // careful, color IS NOT hexadecimal color value because so
+            // careful, color IS NOT hexadecimal color value
             ic1.setColorFilter(Color.BLUE, mode); //SRC_IN, SRC_ATOP, OVERLAY, MULTIPLY ...
 
         } else {
-            // careful, color IS NOT hexadecimal color value because so
+            // careful, color IS NOT hexadecimal color value
             ic1.setColorFilter(Color.GREEN, mode); //SRC_IN, OVERLAY, ...
 
         }

@@ -18,7 +18,7 @@ public class DijkstraAssemblyManager implements AssemblyManager {
     // TODO maybe add option for some team chef to choose assembly place, but only if
     // the device graph is still consistent - to avoid problem with obstacles like fences and accuracy (see AvMap TODOs)
 
-    // TODO maybe also add another strategy of choosing place, as another manager
+    // could also add another strategy of choosing place, as another manager
 
     private static int infty = 1000000000;
     private PriorityQueue<PairSortedBy1<Double, MapPosition>> q = new PriorityQueue<>();
@@ -51,9 +51,9 @@ public class DijkstraAssemblyManager implements AssemblyManager {
             if (map[nowX][nowY] < nowDist) continue;
             for (int i=nowX-1; i<nowX+2; ++i) {
                 for (int j=nowY-1; j<nowY+2; ++j) {
-                    if (AvMap.notIn(i) || AvMap.notIn(j)) continue;
-                    if (i==nowX || j==nowY) modif=2.0; else modif = 2*sqrt(2);
-                    if (avMap.availableTerrain(i,j)) modif = 0.5*modif;
+                    if (avMap.notIn(i) || avMap.notIn(j)) continue;
+                    if (i==nowX || j==nowY) modif=2.0; else modif = 2*sqrt(2);  // diagonal move is longer
+                    if (avMap.availableTerrain(i,j)) modif = 0.3*modif;  // prefer routes known as passable
                     newDist = nowDist + modif;
                     if (newDist < map[i][j]) {
                         q.add(new PairSortedBy1(newDist, new MapPosition(i, j)));
@@ -64,30 +64,28 @@ public class DijkstraAssemblyManager implements AssemblyManager {
         }
     }
 
-
-    // can be static, but when no interface
-    // TODO this is only for tests, maybe delete it and move code to function returning GPS position
+    // this is only for tests
     @Override
     public MapPosition chooseMapAssemblyPlace(Team team, AvMap terrainOKmap) {
         // one grid for Dijkstra from current device and one for sum of distances (squares) from previous Dijkstras
-        double[][] thisDijkstra = new double[AvMap.size][AvMap.size];
-        double[][] sumDijkstra = new double[AvMap.size][AvMap.size];
+        double[][] thisDijkstra = new double[terrainOKmap.size][terrainOKmap.size];
+        double[][] sumDijkstra = new double[terrainOKmap.size][terrainOKmap.size];
 
         //run one Dijkstra for each user, accumulate results and choose best place (from marked as available)
         for (User u : team.getUsers() ){
-            computeNewDijkstra(thisDijkstra, terrainOKmap, terrainOKmap.getCenterRelativeMapPositionFromGPS(u.getGpsPosition())/*u.getMapPosition()*/);
-            for (int i=0; i<AvMap.size; ++i) {
-                for (int j=0; j<AvMap.size; ++j) {
+            computeNewDijkstra(thisDijkstra, terrainOKmap, terrainOKmap.getCenterRelativeMapPositionFromGPS(u.getGpsPosition()));
+            for (int i=0; i<terrainOKmap.size; ++i) {
+                for (int j=0; j<terrainOKmap.size; ++j) {
                     sumDijkstra[i][j] += (thisDijkstra[i][j])*(thisDijkstra[i][j]);
                 }
             }
         }
 
         double bestDist = infty;
-        int bestx = AvMap.center, besty = AvMap.center;
+        int bestx = terrainOKmap.center, besty = terrainOKmap.center;
 
-        for (int i=0; i<AvMap.size; ++i) {
-            for (int j=0; j<AvMap.size; ++j) {
+        for (int i=0; i<terrainOKmap.size; ++i) {
+            for (int j=0; j<terrainOKmap.size; ++j) {
                 if (sumDijkstra[i][j] < bestDist) {
                     bestDist = sumDijkstra[i][j];
                     bestx = i;
@@ -96,13 +94,7 @@ public class DijkstraAssemblyManager implements AssemblyManager {
             }
         }
 
-        // bestx, besty are center-relative (called)
-
         return terrainOKmap.getCenterRelativeMapPositionFromAbsolute(new MapPosition(bestx, besty));
-               //terrainOKmap.getCenterRelativeMapPosition(new MapPosition(bestx, besty));
-               //terrainOKmap.getRelativeToCurrentMapPosition(new MapPosition(bestx, besty));
-        // NOPE - we need to get GPS position to show; same as with "available" terrain
-        // we want non-relative GPS position
     }
 
     @Override

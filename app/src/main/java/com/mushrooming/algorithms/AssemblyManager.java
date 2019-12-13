@@ -10,4 +10,5 @@ import com.mushrooming.base.Team;
 public interface AssemblyManager {
     Position chooseGPSAssemblyPlace(Team team, AvMap terrainOKmap);
     MapPosition chooseMapAssemblyPlace(Team team, AvMap terrainOKmap);
+    // not really needed as we only need GPS position outside of algo module
 }

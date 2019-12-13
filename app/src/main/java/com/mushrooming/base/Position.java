@@ -6,8 +6,8 @@ package com.mushrooming.base;
 
 public class Position {
     private double _x, _y;
-    // remember latitude and longitude, +/-: N/S E/W
-    // ,aybe remember it in more fields: degs, mins, secs
+    // remember latitude and longitude in degrees, +/-: N/S E/W
+    // maybe could remember it in more fields: degs, mins, secs
 
     public Position(double x, double y) {
         _x = x;

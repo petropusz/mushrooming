@@ -33,31 +33,22 @@ public class AvMapTest {
         list.add(mp2);
         list.add(mp3);
         av.markCenterRelativeMapPositions(list);
-        MapPosition mp11 = av.getAbsoluteMapPositionFromCenterRelative(mp1);
-        MapPosition mp21 = av.getAbsoluteMapPositionFromCenterRelative(mp2);
-        MapPosition mp31 = av.getAbsoluteMapPositionFromCenterRelative(mp3);
-        assertEquals(true, av.availableTerrain(mp11.getIntX(),mp11.getIntY()));
-        assertEquals(true, av.availableTerrain(mp21.getIntX(),mp21.getIntY()));
-        assertEquals(true, av.availableTerrain(mp31.getIntX(),mp31.getIntY()));
+        for (MapPosition mp : list) {
+            MapPosition absoluteMP = av.getAbsoluteMapPositionFromCenterRelative(mp);
+            assertEquals(true, av.availableTerrain(absoluteMP.getIntX(), absoluteMP.getIntY()));
+        }
     }
 
-
-    /*@Test
-    public void getNonRelativePosition() throws Exception {
-        AvMap av = new AvMap();
-        av.moveToRelativeToCurrentMapPosition(new MapPosition(100,100));  // not used anymore
-        assertEquals(new MapPosition(652,652), av.getCenterRelativeMapPositionFromAbsolute(new MapPosition(100,100)));
-    }*/
 
     @Test
     public void recenter() throws Exception {
         AvMap av = new AvMap();
         Position oldCenter = av.getNonRelativeGPSposition(new MapPosition(0,0));  // we get GPS coord of center
         //MapPosition mp = av.getCenterRelativeMapPositionFromAbsolute(new MapPosition(0,0));
-        av.recenter(av.getNonRelativeGPSposition(new MapPosition(400,400)));
+        av.recenter(av.getNonRelativeGPSposition(new MapPosition(av.size/2-5,av.size/2-5)));
         MapPosition mp = av.getCenterRelativeMapPositionFromGPS(oldCenter);
-        assertEquals(mp.getIntX(), -400);
-        assertEquals(mp.getIntY(), -400);
+        assertEquals(mp.getIntX(), -(av.size/2-5));
+        assertEquals(mp.getIntY(), -(av.size/2-5));
     }
 
 }

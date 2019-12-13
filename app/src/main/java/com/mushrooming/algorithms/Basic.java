@@ -5,6 +5,11 @@ package com.mushrooming.algorithms;
  */
 // implemented because Integer.min etc may be not be available on older Androids??
 public abstract class Basic {
+
+    static int abs(int a) { return max(a,-a); }
+
+    static double abs(double a) { return max(a,-a); }
+
     static int min(int a, int b) {
         if (a<b) return a; else return b;
     }
