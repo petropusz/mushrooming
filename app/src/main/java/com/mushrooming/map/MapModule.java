@@ -111,6 +111,7 @@ public class MapModule {
 
     // currently switches between marking two different hardcoded positions
     // test currently present in the app, so it is here to be invoked by App class on real device
+    // and also because it is hard to fully automatically test if sth is displayed etc
     public void testMarkPosition() {
 
         //  if mv.getOverlays().contains(marker) {  mv.getOverlays().remove(marker); }

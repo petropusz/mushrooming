@@ -12,12 +12,24 @@ import java.util.Collection;
 
 public class AvMap {
 
+    public static double recenterCriterium = 0.11; // part of size from margin to recenter the map
+                                                   // this + resizeCriterium HAS TO be < 0.5
+                                                   // otherwise with 2 points marked in turns (stable positions):
+                                                   // in center and almost resizeCriterium to the north
+                                                   // this class would recenter every time
+                                                   // ALSO need recenter on resize to be safe from this
+    public static double resizeCriterium = 0.38; // part of size that difference on x or y between
+                                                 // furthest points has to be to enlarge *2
+                                                 // has to be < 0.5, because otherwise
+                                                 // recentering could move some device out of map
+
     // https://gis.stackexchange.com/questions/2951/algorithm-for-offsetting-a-latitude-longitude-by-some-amount-of-meters/2964
     public static double XSCALE = 111111; // approx 111111 meters for one degree
     public static double YSCALE = 111111; // approx 111111*cos(xGPS) is one degree
+    public static int startsize = 905;
 
-    public int size = 905;
-    public int center = size/2;
+    private int size = startsize;
+    private int center = size/2;
 
     private boolean[][] availableTerrain = new boolean[size][size];
 
@@ -37,13 +49,19 @@ public class AvMap {
         }
         if (pos == null) pos = new Position(0,0);
         positionGPSofCenter = pos;
-        //xpos = size/2;
-        //ypos = size/2;
         xmin = center;
         xmax = center;
         ymin = center;
         ymax = center;
-        //availableTerrain[(int)xpos][(int)ypos] = true;
+        //availableTerrainAbsolute[(int)xpos][(int)ypos] = true;
+    }
+
+    public int getSize() {
+        return size;
+    }
+
+    public int getCenter() {
+        return center;
     }
 
     // only for tests
@@ -51,11 +69,16 @@ public class AvMap {
         positionGPSofCenter = new Position(0,0);
     }
 
-    public boolean availableTerrain(int i, int j) {
+    public boolean availableTerrainAbsolute(int i, int j) {
         return availableTerrain[i][j];
     }
 
-    private void updateRanges(int newx, int newy) {
+    public boolean availableTerrain(int i, int j) {
+        return availableTerrain[i+center][j+center];
+    }
+
+    // position needed not to accumulate errors when recentering needed
+    private void updateRanges(int newx, int newy, Position posGPS) {
         xmin = Basic.min(xmin, newx);
         xmax = Basic.max(xmax, newx);
         ymin = Basic.min(ymin, newy);
@@ -67,17 +90,38 @@ public class AvMap {
         // map will only be recentered
         int xdiff = xmax - xmin;
         int ydiff = ymax - ymin;
-        if (xdiff*3 > 2*size || ydiff*3 > 2*size) {
-            boolean[][] newAvTer = new boolean[2*size-1][2*size-1];
-            int diff = (2*size - 1)/2 - size/2;
-            for (int i=0; i<size; ++i) {
-                for (int j=0; j<size; ++j) {
-                    newAvTer[diff+i][diff+j] = availableTerrain[i][j];
+        if ((double)xdiff > resizeCriterium*size || (double)ydiff > resizeCriterium*size) {
+            int needed = Basic.max(xdiff,ydiff);
+            int oldsize = size;
+            int oldcenter = center;
+            // as will later recenter here (see comments below),
+            // need to update GPS pos of center
+            positionGPSofCenter = posGPS;
+            while (needed > resizeCriterium*size) {
+                size = size * 2 - 1;
+                center = size / 2;
+            }
+            boolean[][] newAvTer = new boolean[size][size];
+            int diffx = center - newx;
+            int diffy = center - newy;
+            // also recenter to keep invariants described near resizeCriterium declaration
+            // 'regular' recenter won't have recentering conditions met after resize
+            for (int i=0; i<oldsize; ++i) {
+                for (int j=0; j<oldsize; ++j) {
+                    newAvTer[diffx+i][diffy+j] = availableTerrain[i][j];
                 }
             }
             availableTerrain = newAvTer;
-            size *= 2;
-            center = size / 2;
+            // changing xyminmax so that won't keep map of regions from which users moved
+            // if they are close to each other in the new region
+            // shouldn't move map out of someone's position with that
+            // as one would have to move very quickly
+            // in a very unprobable case sth like that happens
+            // would lose some information about terrain availability there
+            xmin = center;
+            xmax = center;
+            ymin = center;
+            ymax = center;
         }
     }
 
@@ -96,10 +140,18 @@ public class AvMap {
     }
 
     public void markCenterRelativeMapPosition(MapPosition relativeToCenter) {
-        int x1 = relativeToCenter.getIntX() + center, y1 = relativeToCenter.getIntY() + center;
+        Position gps = getNonRelativeGPSposition(relativeToCenter);
+        MapPosition absolute = getAbsoluteMapPositionFromCenterRelative(relativeToCenter);
+        int x1 = absolute.getIntX(), y1 = absolute.getIntY();
         if(shouldIgnore(x1,y1)) return;
-        updateRanges(x1, y1);
+        updateRanges(x1, y1, gps);
+        // absolute could have changed, and could have been recentered
+        // use GPS position to conveniently deal with that
+        absolute = getAbsoluteMapPositionFromCenterRelative(getCenterRelativeMapPositionFromGPS(gps));
+        x1 = absolute.getIntX();
+        y1 = absolute.getIntY();
         availableTerrain[x1][y1] = true;
+        recenter(getNonRelativeGPSposition(relativeToCenter));  //every position marking does this
     }
 
 
@@ -112,14 +164,19 @@ public class AvMap {
 
     public void markPosition(Position posGPS) {
 
-        MapPosition centerRelative = getCenterRelativeMapPositionFromGPS(posGPS);
+        MapPosition relative = getCenterRelativeMapPositionFromGPS(posGPS);
+        MapPosition absolute = getAbsoluteMapPositionFromCenterRelative(relative);
 
-        int x1 = centerRelative.getIntX();
-        int y1 = centerRelative.getIntY();
+        int x1 = absolute.getIntX();
+        int y1 = absolute.getIntY();
 
         if(shouldIgnore(x1,y1)) return;
 
-        updateRanges(x1, y1);
+        updateRanges(x1, y1, posGPS);
+        // absolute could have changed, and could have been recentered
+        absolute = getAbsoluteMapPositionFromCenterRelative(getCenterRelativeMapPositionFromGPS(posGPS));
+        x1 = absolute.getIntX();
+        y1 = absolute.getIntY();
         availableTerrain[x1][y1] = true;
 
         recenter(posGPS);  //every position marking does this
@@ -150,11 +207,6 @@ public class AvMap {
         );
     }
 
-    public MapPosition getRelativeToCurrentMapPosition(MapPosition relativeToCenter) {
-        if (relativeToCenter == null) return null;
-        return new MapPosition(relativeToCenter.getX()-center, relativeToCenter.getY()-center);
-    }
-
     public Position getNonRelativeGPSposition(MapPosition centerRelative){
         double xGPS = centerRelative.getX() * (1.0/XSCALE) + positionGPSofCenter.getX();
         double yGPS = centerRelative.getY() * (1.0/ (YSCALE*Math.cos(xGPS)) ) + positionGPSofCenter.getY();
@@ -174,7 +226,8 @@ public class AvMap {
         int x1_ = absolute.getIntX();
         int y1_ = absolute.getIntY();
 
-        if (x1_< size/6 || x1_ > (5*size)/6 || y1_ < size/6 || y1_ > (5*size)/6) {
+        if (x1_ < recenterCriterium*size || x1_ > (1.-recenterCriterium)*size ||
+            y1_ < recenterCriterium*size || y1_ > (1.-recenterCriterium)*size) {
 
             // recenter map on this position
 
@@ -186,29 +239,29 @@ public class AvMap {
 
             // determine direction of offset and thus sequence of map update
             if (xdelta > 0) {
-                x1 = Basic.max(xmin-xdelta, 0);
-                x2 = xmax;
+                x1 = 0; //Basic.max(xmin-xdelta, 0);
+                x2 = size; //Basic.max(xmax-xdelta, 0);
                 xd = 1;
             } else {
-                x1 = Basic.min(xmax-xdelta, size);
-                x2 = xmin;
+                x1 = size-1; //Basic.min(xmax-xdelta, size);
+                x2 = -1; //Basic.min(xmin-xdelta, size);
                 xd = -1;
             }
             if (ydelta > 0) {
-                y1 = Basic.max(ymin-ydelta, 0);
-                y2 = ymax;
+                y1 = 0; //Basic.max(ymin-ydelta, 0);
+                y2 = size; //Basic.max(ymax-ydelta, 0);
                 yd = 1;
             } else {
-                y1 = Basic.min(ymax-ydelta, size);
-                y2 = ymin;
+                y1 = size-1; //Basic.min(ymax-ydelta, size);
+                y2 = -1; //Basic.min(ymin-ydelta, size);
                 yd = -1;
             }
 
             // update map without copying, writing on fields whose data will be out of map range first
             for (int i=x1; i!=x2; i+=xd) {
                 for (int j=y1; j!=y2; j+=yd) {
-                    if (notIn(i-xdelta) || notIn(j-ydelta)) availableTerrain[i][j] = false;
-                    else availableTerrain[i][j] = availableTerrain[i-xdelta][j-ydelta];
+                    if (notIn(i+xdelta) || notIn(j+ydelta)) availableTerrain[i][j] = false;
+                    else availableTerrain[i][j] = availableTerrain[i+xdelta][j+ydelta];
                 }
             }
 

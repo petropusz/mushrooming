@@ -53,7 +53,7 @@ public class DijkstraAssemblyManager implements AssemblyManager {
                 for (int j=nowY-1; j<nowY+2; ++j) {
                     if (avMap.notIn(i) || avMap.notIn(j)) continue;
                     if (i==nowX || j==nowY) modif=2.0; else modif = 2*sqrt(2);  // diagonal move is longer
-                    if (avMap.availableTerrain(i,j)) modif = 0.3*modif;  // prefer routes known as passable
+                    if (avMap.availableTerrainAbsolute(i,j)) modif = 0.3*modif;  // prefer routes known as passable
                     newDist = nowDist + modif;
                     if (newDist < map[i][j]) {
                         q.add(new PairSortedBy1(newDist, new MapPosition(i, j)));
@@ -68,24 +68,24 @@ public class DijkstraAssemblyManager implements AssemblyManager {
     @Override
     public MapPosition chooseMapAssemblyPlace(Team team, AvMap terrainOKmap) {
         // one grid for Dijkstra from current device and one for sum of distances (squares) from previous Dijkstras
-        double[][] thisDijkstra = new double[terrainOKmap.size][terrainOKmap.size];
-        double[][] sumDijkstra = new double[terrainOKmap.size][terrainOKmap.size];
+        double[][] thisDijkstra = new double[terrainOKmap.getSize()][terrainOKmap.getSize()];
+        double[][] sumDijkstra = new double[terrainOKmap.getSize()][terrainOKmap.getSize()];
 
         //run one Dijkstra for each user, accumulate results and choose best place (from marked as available)
         for (User u : team.getUsers() ){
             computeNewDijkstra(thisDijkstra, terrainOKmap, terrainOKmap.getCenterRelativeMapPositionFromGPS(u.getGpsPosition()));
-            for (int i=0; i<terrainOKmap.size; ++i) {
-                for (int j=0; j<terrainOKmap.size; ++j) {
+            for (int i=0; i<terrainOKmap.getSize(); ++i) {
+                for (int j=0; j<terrainOKmap.getSize(); ++j) {
                     sumDijkstra[i][j] += (thisDijkstra[i][j])*(thisDijkstra[i][j]);
                 }
             }
         }
 
         double bestDist = infty;
-        int bestx = terrainOKmap.center, besty = terrainOKmap.center;
+        int bestx = terrainOKmap.getCenter(), besty = terrainOKmap.getCenter();
 
-        for (int i=0; i<terrainOKmap.size; ++i) {
-            for (int j=0; j<terrainOKmap.size; ++j) {
+        for (int i=0; i<terrainOKmap.getSize(); ++i) {
+            for (int j=0; j<terrainOKmap.getSize(); ++j) {
                 if (sumDijkstra[i][j] < bestDist) {
                     bestDist = sumDijkstra[i][j];
                     bestx = i;
